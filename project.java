@@ -1,9 +1,13 @@
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
-class Consumer {
+// ==========================================
+// 1. ENCAPSULATION & INHERITANCE
+// ==========================================
+abstract class Consumer {
     private final int id;
     private final String name;
-    private final int unitsConsumed;
+    protected final int unitsConsumed;
 
     public Consumer(int id, String name, int unitsConsumed) {
         this.id = id;
@@ -14,72 +18,118 @@ class Consumer {
     public int getId() { return id; }
     public String getName() { return name; }
     public int getUnitsConsumed() { return unitsConsumed; }
+
+    // Abstract method to be overridden by subclasses (Polymorphism)
+    public abstract double calculateBill();
 }
 
-class TariffCalculator {
-    private static final double RATE_SLAB_1 = 1.5;
-    private static final double RATE_SLAB_2 = 2.5;
-    private static final double RATE_SLAB_3 = 4.0;
-    private static final double RATE_SLAB_4 = 6.0;
+// Residential Consumer with slab-based pricing
+class ResidentialConsumer extends Consumer {
+    public ResidentialConsumer(int id, String name, int unitsConsumed) {
+        super(id, name, unitsConsumed);
+    }
 
-    public double generateBill(Consumer consumer) {
-        int units = consumer.getUnitsConsumed();
-        
-        if (units <= 100) return units * RATE_SLAB_1;
-        if (units <= 200) return (100 * RATE_SLAB_1) + ((units - 100) * RATE_SLAB_2);
-        if (units <= 300) return (100 * RATE_SLAB_1) + (100 * RATE_SLAB_2) + ((units - 200) * RATE_SLAB_3);
-        
-        return (100 * RATE_SLAB_1) + (100 * RATE_SLAB_2) + (100 * RATE_SLAB_3) + ((units - 300) * RATE_SLAB_4);
+    @Override
+    public double calculateBill() {
+        int units = this.unitsConsumed;
+        if (units <= 100) return units * 1.5;
+        if (units <= 200) return (100 * 1.5) + ((units - 100) * 2.5);
+        if (units <= 300) return (100 * 1.5) + (100 * 2.5) + ((units - 200) * 4.0);
+        return (100 * 1.5) + (100 * 2.5) + (100 * 4.0) + ((units - 300) * 6.0);
     }
 }
 
-public class ElectricityBillingSystem {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        TariffCalculator calculator = new TariffCalculator();
+// Commercial Consumer with a flat rate + base commercial tax
+class CommercialConsumer extends Consumer {
+    private static final double FLAT_RATE = 7.5;
+    private static final double COMMERCIAL_TAX = 250.00;
 
-        System.out.print("Enter the number of consumers to process: ");
-        int totalConsumers = sc.nextInt();
+    public CommercialConsumer(int id, String name, int unitsConsumed) {
+        super(id, name, unitsConsumed);
+    }
+
+    @Override
+    public double calculateBill() {
+        return (this.unitsConsumed * FLAT_RATE) + COMMERCIAL_TAX;
+    }
+}
+
+// ==========================================
+// 2. CORE SYSTEM DRIVER
+// ==========================================
+public class ElectricityBillingSystem {
+    private static final Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        System.out.println("=== Commercial & Residential Electricity Billing System ===");
         
-        // Initializing the Consumer object array
+        int totalConsumers = readValidInt("Enter total number of consumers to process: ", 1, 100);
+        
+        // ARRAY IMPLEMENTATION: Storing heterogeneous subclass objects in a base class array
         Consumer[] consumers = new Consumer[totalConsumers];
 
-        // Population loop for the array
         for (int i = 0; i < consumers.length; i++) {
             System.out.println("\n--- Entering Details for Consumer #" + (i + 1) + " ---");
             
-            System.out.print("Enter Consumer ID: ");
-            int id = sc.nextInt();
-            sc.nextLine(); // Clear buffer
-
+            int type = readValidInt("Select Category (1 for Residential, 2 for Commercial): ", 1, 2);
+            int id = readValidInt("Enter Consumer ID: ", 1, Integer.MAX_VALUE);
+            
             System.out.print("Enter Consumer Name: ");
             String name = sc.nextLine().trim();
+            while (name.isEmpty()) {
+                System.out.print("Name cannot be empty. Re-enter: ");
+                name = sc.nextLine().trim();
+            }
 
-            System.out.print("Enter Units Consumed: ");
-            int units = sc.nextInt();
+            int units = readValidInt("Enter Units Consumed: ", 0, Integer.MAX_VALUE);
 
-            // Store object inside our array
-            consumers[i] = new Consumer(id, name, units);
+            // Polymorphic instantiation based on selection
+            if (type == 1) {
+                consumers[i] = new ResidentialConsumer(id, name, units);
+            } else {
+                consumers[i] = new CommercialConsumer(id, name, units);
+            }
         }
 
-        // Processing & Displaying the final Consolidated Report
-        System.out.println("\n======================================================================");
-        System.out.println("                      CONSOLIDATED ELECTRICITY BILLS                  ");
-        System.out.println("======================================================================");
-        System.out.printf("%-12s | %-22s | %-14s | %-12s\n", "Consumer ID", "Name", "Units Consumed", "Total Bill");
-        System.out.println("----------------------------------------------------------------------");
+        // ==========================================
+        // 3. GENERATE CONSOLIDATED MANAGEMENT REPORT
+        // ==========================================
+        System.out.println("\n=================================================================================");
+        System.out.println("                           CONSOLIDATED BILLING LEDGER                           ");
+        System.out.println("=================================================================================");
+        System.out.printf("%-12s | %-20s | %-15s | %-14s | %-12s\n", "ID", "Name", "Type", "Units Consumed", "Total Bill");
+        System.out.println("---------------------------------------------------------------------------------");
 
         for (Consumer consumer : consumers) {
-            double totalBill = calculator.generateBill(consumer);
-            System.out.printf("%-12d | %-22s | %-14d | Rs. %-10.2f\n", 
+            String typeStr = (consumer instanceof ResidentialConsumer) ? "Residential" : "Commercial";
+            System.out.printf("%-12d | %-20s | %-15s | %-14d | Rs. %-10.2f\n", 
                 consumer.getId(), 
                 consumer.getName(), 
+                typeStr,
                 consumer.getUnitsConsumed(), 
-                totalBill
+                consumer.calculateBill()
             );
         }
-        System.out.println("======================================================================");
+        System.out.println("=================================================================================");
 
         sc.close();
+    }
+
+    private static int readValidInt(String prompt, int min, int max) {
+        int value;
+        while (true) {
+            System.out.print(prompt);
+            try {
+                value = sc.nextInt();
+                sc.nextLine(); // Clear scanner buffer cleanly
+                if (value >= min && value <= max) {
+                    return value;
+                }
+                System.out.printf("Input out of range! Please enter a value between %d and %d.\n", min, max);
+            } catch (InputMismatchException e) {
+                System.out.println("Invalid entry! Please enter a valid numerical whole number.");
+                sc.nextLine(); // Clear bad buffer string completely
+            }
+        }
     }
 }
